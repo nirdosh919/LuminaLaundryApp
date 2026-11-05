@@ -1,4 +1,4 @@
-{
+﻿{
   "expo": {
     "name": "LuminaLaundryApp",
     "slug": "LuminaLaundryApp",
@@ -8,11 +8,12 @@
     "scheme": "luminalaundryapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png"
     },
     "android": {
+      "package": "com.luminalaundry.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#E9F1ED",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -28,15 +29,34 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#F7F5F0",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 240
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Lumina uses your location only to place a pickup pin. You can also enter your address manually."
+        }
+      ],
+      [
+        "expo-maps",
+        {
+          "requestLocationPermission": false
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1d2a9088-446b-4bcf-bbd5-b5668fb3344e"
+      }
     }
   }
 }

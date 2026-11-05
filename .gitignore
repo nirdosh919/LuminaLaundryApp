@@ -31,6 +31,10 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+.env.*
+!.env.example
+!.env.*.example
 .env*.local
 
 # typescript
@@ -41,3 +45,95 @@ example
 # generated native folders
 /ios
 /android
+
+# Dependencies
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Backups
+*.bak
+*.backup
+*.before-fix
+*.before-*
+*.zip
+*.log
+
+# Local development
+.playwright-mcp/
+.local/
+local-server-logs/
+
+# Project backups
+.codex-backup-*/
+.bom-backups/
+_project_audit/
+_route_backups/
+*_backup_*/
+backup-*/
+*-backup-*/
+
+# Diagnostic files
+lumina-debug.txt
+lumina-routes.txt
+lumina-api-files.txt
+reload-diagnostic.txt
+
+# Laravel website source (keep separate)
+luminalaundry.com/
+lumina (2)/
+
+# Local configuration
+.DS_Store
+
+# All backup directories
+**/*backup*/
+**/*-backup*/
+**/*_backup*/
+**/auth-diagnostic-*/
+**/navigation-route-fix-*/
+**/predeploy-*/
+**/ui-before-restore-*/
+
+# Backup configuration files
+*.reload-backup
+*.sdk58-backup
+*.statusbar-backup
+*.error-backup
+*.loop-backup
+*.session-backup
+*.bak
+*.backup
+
+# Temporary reports and diagnostics
+*-diagnostic*
+*-audit*
+*-results.txt
+ui-audit-routes.txt
+day1-check-results.txt
+PROJECT_FILE_INVENTORY.txt
+
+
+# Ignore all backup files and folders
+**/*backup*
+**/*backup-*
+**/*.bak
+**/*.before-*
+**/*.reload-backup
+**/*.sdk58-backup
+**/*.statusbar-backup
+**/*.error-backup
+**/*.loop-backup
+**/*.session-backup
+
+# Temporary archives
+*.zip
+
+
+*.bak*

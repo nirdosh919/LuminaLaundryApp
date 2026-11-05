@@ -1,0 +1,222 @@
+
+========== src/app/services.tsx ==========
+2: import { router, useFocusEffect } from "expo-router";
+3: import { useCallback, useMemo, useState } from "react";
+6: import { fetchServices, type CatalogService } from "@/lib/laundry-api";
+14: const [services, setServices] = useState<CatalogService[]>([]);
+15: const [favorites, setFavorites] = useState<number[]>([]);
+16: const [search, setSearch] = useState("");
+17: const [category, setCategory] = useState("All");
+18: const [loading, setLoading] = useState(true);
+19: const [error, setError] = useState("");
+20: const [feedback, setFeedback] = useState("");
+27: fetchServices(),
+44: useFocusEffect(useCallback(() => { void load(); }, [load]));
+78: <View style={styles.header}><View><Text style={styles.brand}>LUMINA</Text><Text style={styles.caption}>LAUNDRY & CARE</Text></View><Pressable accessibilityRole="button" onPress={() => router.push("/cart")} style={styles.cartButton}><Text style={styles.cartText}>Cart  →</Text></Pressable></View>
+82: <TextInput value={search} onChangeText={setSearch} placeholder="Search laundry services" placeholderTextColor="#4B5B50" style={styles.search} accessibilityLabel="Search services" />
+83: <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{categories.map((item) => <Pressable key={item} accessibilityRole="button" accessibilityState={{ selected: category === item }} onPress={() => setCategory(item)} style={[styles.filter, category === item && styles.filterActive]}><Text style={[styles.filterText, category === item && styles.filterTextActive]}>{item}</Text></Pressable>)}</ScrollView>
+84: {!!feedback && <View style={styles.cartFeedback}><Text style={styles.cartFeedbackText}>{feedback}</Text><Pressable accessibilityRole="button" onPress={() => router.push("/cart")}><Text style={styles.cartFeedbackLink}>Open bag  →</Text></Pressable></View>}
+87: {!loading && !!error && <View style={styles.stateCard}><Text style={styles.cardTitle}>Services are unavailable</Text><Text style={styles.description}>{error}</Text><Pressable accessibilityRole="button" onPress={() => void load()} style={styles.retry}><Text style={styles.addButtonText}>Try again</Text></Pressable></View>}
+90: <Pressable accessibilityRole="button" accessibilityLabel={`View ${service.name} details`} onPress={() => router.push({ pathname: "/service-details", params: { id: String(service.id) } })} style={styles.iconBox}><Text style={styles.icon}>{ICONS[index % ICONS.length]}</Text></Pressable>
+91: <View style={styles.cardBody}><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/service-details", params: { id: String(service.id) } })}><Text style={styles.cardTitle}>{service.name}</Text></Pressable><Text style={styles.description}>{service.description || "Care service from a participating local shop."}</Text><Text style={styles.price}>From ₹{service.price.toLocaleString("en-IN")}</Text><Text style={styles.vendor}>{service.vendor_name || "Participating local shop"}</Text><Pressable accessibilityRole="button" style={styles.addButton} onPress={() => void addToCart(service)}><Text style={styles.addButtonText}>Add to bag  +</Text></Pressable></View>
+92: <Pressable accessibilityRole="button" accessibilityLabel={favorites.includes(service.id) ? `Remove ${service.name} from favourites` : `Save ${service.name} to favourites`} accessibilityState={{ selected: favorites.includes(service.id) }} onPress={() => void toggleFavorite(service)}><Text style={[styles.heart, favorites.includes(service.id) && styles.heartActive]}>{favorites.includes(service.id) ? "♥" : "♡"}</Text></Pressable>
+
+========== src/app/cart.tsx ==========
+2: import { useFocusEffect, useRouter } from "expo-router";
+3: import React, { useCallback, useState } from "react";
+16: const [items, setItems] = useState<CartItem[]>([]);
+17: const [ready, setReady] = useState(false);
+18: const [removeId, setRemoveId] = useState<string | null>(null);
+19: const [confirmClear, setConfirmClear] = useState(false);
+20: const [storageError, setStorageError] = useState("");
+31: useFocusEffect(refresh);
+44: <Pressable onPress={() => router.back()}><Text style={s.back}>←  Services</Text></Pressable>
+51: <Pressable style={s.primary} onPress={() => router.push("/services")}><Text style={s.primaryText}>Browse services</Text></Pressable>
+57: <Pressable accessibilityLabel={`Decrease ${item.name}`} style={s.qtyButton} onPress={() => void update(items.map(x => x.id === item.id ? { ...x, quantity: Math.max(1, x.quantity - 1) } : x))}><Text style={s.qtyText}>−</Text></Pressable>
+59: <Pressable accessibilityLabel={`Increase ${item.name}`} style={s.qtyButton} onPress={() => void update(items.map(x => x.id === item.id ? { ...x, quantity: Math.min(50, x.quantity + 1) } : x))}><Text style={s.qtyText}>+</Text></Pressable>
+60: <Pressable accessibilityRole="button" style={s.remove} onPress={() => setRemoveId(removeId === item.id ? null : item.id)}><Text style={s.removeText}>Remove</Text></Pressable>
+62: {removeId === item.id && <View style={s.confirmRow}><Text style={s.note}>Remove this service from your bag?</Text><Pressable accessibilityRole="button" onPress={() => {setRemoveId(null);void update(items.filter(x=>x.id!==item.id));}}><Text style={s.removeText}>Remove</Text></Pressable><Pressable accessibilityRole="button" onPress={() => setRemoveId(null)}><Text style={s.keepText}>Keep</Text></Pressable></View>}
+69: <Pressable style={s.primary} onPress={() => router.push("/checkout")}><Text style={s.primaryText}>Choose pickup time  →</Text></Pressable>
+71: <Pressable accessibilityRole="button" style={s.clear} onPress={() => setConfirmClear(value => !value)}><Text style={s.removeText}>Clear cart</Text></Pressable>
+72: {confirmClear && <View style={s.confirmClear}><Text style={s.note}>Remove every service from your bag?</Text><View style={s.clearActions}><Pressable accessibilityRole="button" onPress={() => {setConfirmClear(false);void update([]);}}><Text style={s.removeText}>Clear all</Text></Pressable><Pressable accessibilityRole="button" onPress={() => setConfirmClear(false)}><Text style={s.keepText}>Keep cart</Text></Pressable></View></View>}
+
+========== src/app/checkout.tsx ==========
+2: import { router, useFocusEffect } from "expo-router";
+3: import { useCallback, useMemo, useState } from "react";
+93: const [items, setItems] = useState<CartItem[]>([]);
+94: const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+95: const [selectedAddressId, setSelectedAddress] = useState("");
+97: useState<SavedAddress | null>(null);
+98: const [name, setName] = useState("");
+99: const [phone, setPhone] = useState("");
+100: const [address, setAddress] = useState("");
+101: const [city, setCity] = useState("");
+102: const [state, setState] = useState("");
+103: const [pincode, setPincode] = useState("");
+104: const [instructions, setInstructions] = useState("");
+106: useState<ServiceabilityResult | null>(null);
+107: const [slots, setSlots] = useState<PickupSlot[]>([]);
+108: const [selectedSlotId, setSelectedSlotId] = useState("");
+109: const [requestedPickupDate, setRequestedPickupDate] = useState("");
+110: const [requestedDeliveryDate, setRequestedDeliveryDate] = useState("");
+111: const [checkingAvailability, setCheckingAvailability] = useState(false);
+113: useState<PaymentOptionsResult | null>(null);
+115: useState<PaymentMethod | null>(null);
+116: const [busy, setBusy] = useState(false);
+117: const [savedReference, setSavedReference] = useState("");
+118: const [cleanupWarning, setCleanupWarning] = useState("");
+126: useFocusEffect(
+314: router.push("/login");
+396: onChangeText: (next: string) => void,
+404: onChangeText={onChangeText}
+446: <Pressable onPress={() => router.back()} accessibilityRole="button">
+479: onPress={() => void selectAddress(item)}
+554: onPress={() => router.push("/addresses")}
+578: <TextInput value={requestedPickupDate} onChangeText={setRequestedPickupDate} placeholder="2026-11-01" placeholderTextColor={colors.textSecondary} style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.text }]} autoCapitalize="none" />
+580: <TextInput value={requestedDeliveryDate} onChangeText={setRequestedDeliveryDate} placeholder="2026-11-02" placeholderTextColor={colors.textSecondary} style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.text }]} autoCapitalize="none" />
+583: disabled={!selectedAddress || checkingAvailability}
+584: onPress={() => void checkPickupAddress()}
+619: onPress={() => { setSelectedSlotId(slot.id); setRequestedPickupDate(slot.date); }}
+685: onPress={() => setSelectedPaymentMethod(method.id)}
+765: onPress={() => router.push("/(tabs)/orders" as never)}
+776: disabled={busy || items.length === 0}
+777: onPress={() => void placeOrder()}
+
+========== src/app/booking.tsx ==========
+3: import { useMemo, useState } from "react";
+56: const [serviceId, setServiceId] = useState(initialService);
+57: const [quantity, setQuantity] = useState(1);
+58: const [busy, setBusy] = useState(false);
+98: router.push("/checkout");
+113: <Pressable onPress={() => router.back()} accessibilityRole="button">
+131: onPress={() => setServiceId(item.id)}
+155: onPress={() => setQuantity((value) => Math.max(1, value - 1))}
+164: onPress={() => setQuantity((value) => Math.min(50, value + 1))}
+180: disabled={busy}
+182: onPress={() => void continueToCheckout()}
+
+========== src/app/service-details.tsx ==========
+3: import { useEffect, useMemo, useState } from "react";
+6: import { fetchServices, type CatalogService } from "@/lib/laundry-api";
+14: const [service, setService] = useState<CatalogService | null>(null);
+15: const [loading, setLoading] = useState(true);
+16: const [error, setError] = useState("");
+17: const [feedback, setFeedback] = useState("");
+18: const [variantId, setVariantId] = useState<number | null>(null);
+20: useEffect(() => {
+22: fetchServices().then((items) => {
+51: <Pressable accessibilityRole="button" onPress={() => router.back()}><Text style={styles.back}>←  Services</Text></Pressable>
+52: {loading ? <View style={styles.state}><ActivityIndicator color={styles.accent.color as string} /><Text style={styles.copy}>Loading service details…</Text></View> : error ? <View style={styles.panel}><Text style={styles.title}>Service unavailable</Text><Text style={styles.copy}>{error}</Text><Pressable onPress={() => router.replace("/services")}><Text style={styles.link}>Browse services →</Text></Pressable></View> : service ? <>
+55: <View style={styles.panel}><Text style={styles.panelTitle}>Service details</Text><Text style={styles.copy}>From ₹{service.price.toLocaleString("en-IN")} per item</Text><Text style={styles.copy}>Shop: {service.vendor_name || "Participating local shop"}</Text><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/store-details" as never, params: { id: String(service.vendor_id), name: service.vendor_name || "Participating local shop" } })}><Text style={styles.link}>View shop details →</Text></Pressable></View>
+56: {service.variants.length > 0 && <View style={styles.panel}><Text style={styles.panelTitle}>Choose an option</Text>{service.variants.map((variant) => <Pressable key={variant.id} accessibilityRole="radio" accessibilityState={{ checked: variant.id === variantId }} onPress={() => setVariantId(variant.id)} style={[styles.option, variant.id === variantId && styles.optionSelected]}><Text style={styles.copy}>{variant.name}</Text><Text style={styles.optionPrice}>₹{variant.price.toLocaleString("en-IN")}</Text></Pressable>)}</View>}
+58: <Pressable accessibilityRole="button" onPress={() => void addToCart()} style={styles.primary}><Text style={styles.primaryText}>Add to bag · ₹{(selectedVariant?.price ?? service.price).toLocaleString("en-IN")}</Text></Pressable>
+59: <Pressable accessibilityRole="button" onPress={() => router.push("/cart")} style={styles.secondary}><Text style={styles.link}>Review your bag →</Text></Pressable>
+
+========== src/app/stores.tsx ==========
+2: import { useCallback, useEffect, useState } from "react";
+5: import { fetchServices, type CatalogService } from "@/lib/laundry-api";
+12: const [stores, setStores] = useState<Store[]>([]);
+13: const [loading, setLoading] = useState(true);
+14: const [error, setError] = useState("");
+17: const items = await fetchServices();
+32: useEffect(() => { void load(); }, [load]);
+34: <Pressable accessibilityRole="button" onPress={() => router.back()}><Text style={[styles.back, { color: colors.primary }]}>← Back</Text></Pressable>
+37: {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary} /><Text style={[styles.copy, { color: colors.textSecondary }]}>Loading shop directory…</Text></View> : error ? <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}><Text style={[styles.cardTitle, { color: colors.text }]}>Shop directory unavailable</Text><Text style={[styles.copy, { color: colors.textSecondary }]}>{error}</Text><Pressable accessibilityRole="button" onPress={() => { setError(""); setLoading(true); void load(); }}><Text style={[styles.link, { color: colors.primary }]}>Retry</Text></Pressable></View> : stores.length === 0 ? <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}><Text style={[styles.cardTitle, { color: colors.text }]}>No shops available</Text><Text style={[styles.copy, { color: colors.textSecondary }]}>The configured catalogue did not return a participating shop.</Text></View> : stores.map((store) => <Pressable key={store.id} accessibilityRole="button" onPress={() => router.push({ pathname: "/store-details" as never, params: { id: String(store.id), name: store.name } })} style={[styles.card, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}><Text style={[styles.cardTitle, { color: colors.text }]}>{store.name}</Text><Text style={[styles.copy, { color: colors.textSecondary }]}>{store.services.length} catalogue service{store.services.length === 1 ? "" : "s"}</Text><Text style={[styles.link, { color: colors.primary }]}>View shop details →</Text></Pressable>)}
+
+========== src/app/store-details.tsx ==========
+2: import { useEffect, useState } from "react";
+5: import { fetchServices, type CatalogService } from "@/lib/laundry-api";
+13: const [services, setServices] = useState<CatalogService[]>([]);
+14: const [loading, setLoading] = useState(true);
+15: const [error, setError] = useState("");
+16: useEffect(() => {
+18: fetchServices().then((items) => { if (active) setServices(items.filter((item) => String(item.vendor_id) === id)); }).catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "Could not load shop details."); }).finally(() => { if (active) setLoading(false); });
+22: <Pressable accessibilityRole="button" onPress={() => router.back()}><Text style={[styles.back, { color: colors.primary }]}>← Shops</Text></Pressable>
+26: {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary} /><Text style={[styles.copy, { color: colors.textSecondary }]}>Loading services…</Text></View> : error ? <View style={[styles.card, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}><Text style={[styles.copy, { color: colors.danger }]}>{error}</Text></View> : services.length === 0 ? <Text style={[styles.copy, { color: colors.textSecondary }]}>No catalogue services are listed for this shop.</Text> : services.map((service) => <Pressable key={service.id} accessibilityRole="button" onPress={() => router.push({ pathname: "/service-details", params: { id: String(service.id) } })} style={[styles.card, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}><Text style={[styles.cardTitle, { color: colors.text }]}>{service.name}</Text><Text style={[styles.copy, { color: colors.textSecondary }]}>{service.description || service.category || "Laundry care"}</Text><Text style={[styles.link, { color: colors.primary }]}>From ₹{service.price.toLocaleString("en-IN")} · View service →</Text></Pressable>)}
+
+========== src/app/order-details.tsx ==========
+3: import { useEffect, useMemo, useState } from "react";
+15: const [booking, setBooking] = useState<DemoBooking | null>(null);
+16: const [loading, setLoading] = useState(true);
+17: const [error, setError] = useState("");
+18: const [rescheduleDate, setRescheduleDate] = useState("");
+19: const [rescheduleTime, setRescheduleTime] = useState("");
+20: const [notice, setNotice] = useState("");
+21: const [busy, setBusy] = useState(false);
+24: useEffect(() => {
+64: <Pressable accessibilityRole="button" onPress={() => router.back()}><Text style={[styles.back, { color: colors.primary }]}>← Orders</Text></Pressable>
+65: {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary} /><Text style={[styles.copy, { color: colors.textSecondary }]}>Loading booking details…</Text></View> : error || !booking ? <View style={[styles.card, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}><Text style={[styles.title, { color: colors.text }]}>Booking unavailable</Text><Text style={[styles.copy, { color: colors.textSecondary }]}>{error || "This local demo booking could not be found on this device."}</Text><Pressable onPress={() => router.replace("/orders")}><Text style={[styles.link, { color: colors.primary }]}>Back to orders →</Text></Pressable></View> : <>
+83: <TextInput value={rescheduleDate} onChangeText={setRescheduleDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textSecondary} style={[styles.input, { color: colors.text, borderColor: colors.border }]} accessibilityLabel="Preferred pickup date" />
+84: <TextInput value={rescheduleTime} onChangeText={setRescheduleTime} placeholder="Preferred time, e.g. 10:00–12:00" placeholderTextColor={colors.textSecondary} style={[styles.input, { color: colors.text, borderColor: colors.border }]} accessibilityLabel="Preferred pickup time" />
+85: <Pressable disabled={busy} onPress={() => void saveRescheduleRequest()} style={[styles.primary, { backgroundColor: colors.primary }]}><Text style={[styles.primaryText, { color: colors.onPrimary }]}>{busy ? "Saving…" : "Save reschedule preference"}</Text></Pressable>
+86: <Pressable disabled={busy} onPress={() => void cancelLocally()} style={styles.secondary}><Text style={[styles.link, { color: colors.danger }]}>Cancel local demo booking</Text></Pressable>
+
+========== src/app/addresses.tsx ==========
+2: import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+3: import { useCallback, useState } from "react";
+47: const [items, setItems] = useState<SavedAddress[]>([]);
+48: const [selectedId, setSelectedId] = useState<string | null>(null);
+49: const [draft, setDraft] = useState<SavedAddress>(() => ({
+53: const [editing, setEditing] = useState(Boolean(initialCoordinates));
+54: const [loading, setLoading] = useState(true);
+55: const [error, setError] = useState("");
+111: useFocusEffect(
+163: onPress: () => {
+205: onChangeText={(value) =>
+228: <Pressable onPress={() => router.back()} accessibilityRole="button">
+255: onPress={() => setDraft((current) => ({ ...current, label }))}
+286: onPress={async () => {
+289: router.push({
+311: <Pressable onPress={() => void save()} style={[styles.primary, { backgroundColor: colors.primary }]}>
+314: <Pressable onPress={() => { setDraft(EMPTY_ADDRESS); setEditing(false); }} style={styles.cancel}>
+319: <Pressable onPress={beginNew} style={[styles.addButton, { backgroundColor: colors.primary }]}>
+354: <Pressable onPress={() => void choose(item)} style={[styles.primarySmall, { backgroundColor: colors.primary }]}>
+357: <Pressable onPress={() => void setDefaultAddress(item.id).then((next) => {
+365: <Pressable onPress={() => { setDraft(item); setEditing(true); }}>
+368: <Pressable onPress={() => remove(item)}>
+
+========== src/app/address-map.tsx ==========
+4: import { useMemo, useState } from "react";
+41: const [selectedPoint, setSelectedPoint] = useState<LocationPoint | null>(null);
+43: const [query, setQuery] = useState("");
+44: const [results, setResults] = useState<GeocodeResult[]>([]);
+45: const [busy, setBusy] = useState(false);
+46: const [searchAttempted, setSearchAttempted] = useState(false);
+47: const [error, setError] = useState("");
+65: { text: "Open settings", onPress: () => void Linking.openSettings() },
+92: { text: "Continue", onPress: () => void locate() },
+141: <Pressable onPress={() => router.back()} accessibilityRole="button">
+152: disabled={busy}
+153: onPress={explainAndLocate}
+165: onChangeText={setQuery}
+175: disabled={!isGeocodingConfigured || busy || !query.trim()}
+176: onPress={() => void findAddress()}
+195: <Pressable onPress={() => void findAddress()} accessibilityRole="button" style={styles.retry}>
+210: onPress={() => setSelectedPoint(result)}
+238: disabled={!point || busy}
+239: onPress={() => void confirm()}
+246: <Pressable onPress={() => router.back()} accessibilityRole="button" style={styles.manualButton}>
+
+========== src/app/(tabs)/index.tsx ==========
+1: import { router, useFocusEffect, type RelativePathString } from "expo-router";
+2: import { useCallback, useMemo, useState } from "react";
+14: import { fetchOrders, type MobileOrder } from "@/lib/laundry-api";
+66: const [bookings, setBookings] = useState<MobileOrder[]>([]);
+67: const [selectedAddress, setSelectedAddress] = useState<SavedAddress | null>(null);
+68: const [loadError, setLoadError] = useState("");
+69: const [appReady, setAppReady] = useState(false);
+75: fetchOrders(),
+92: useFocusEffect(
+121: onPress={() => router.push("/addresses")}
+138: onPress={() => router.push("/search" as RelativePathString)}
+146: onPress={() => router.push("/notifications")}
+161: onPress={() => router.push("/services")}
+188: onPress={() => router.push("/services")}
+203: onPress={() => router.push("/services")}
+221: onPress={() => router.push("/orders")}
+258: onPress={() => router.push("/orders")}
+266: <Pressable onPress={() => void reloadHome()}>
+273: onPress={() => router.push("/orders")}
+295: <Pressable onPress={() => router.push("/services")}>
+304: onPress={() => router.push("/stores" as RelativePathString)}
+312: onPress={() => router.push("/support")}

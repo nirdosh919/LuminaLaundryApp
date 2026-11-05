@@ -1,0 +1,22 @@
+{
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://luminalaundry.com"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://luminalaundry.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

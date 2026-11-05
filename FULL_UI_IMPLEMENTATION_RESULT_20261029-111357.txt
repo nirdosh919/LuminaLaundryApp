@@ -1,0 +1,5 @@
+Added a catalogue backed service details page at [service-details.tsx](/C:/Users/nirdo/Projects/LuminaLaundryApp/src/app/service-details.tsx), linked from the Services list. It supports service variants and adding items to the bag, with loading and error states and a clear demo limitation: adding an item does not place an order or collect payment.
+
+Updated the audit findings and remaining gaps in [MASTER_FEATURE_TRACKER.md](/C:/Users/nirdo/Projects/LuminaLaundryApp/MASTER_FEATURE_TRACKER.md) and [PROJECT_STATUS.md](/C:/Users/nirdo/Projects/LuminaLaundryApp/PROJECT_STATUS.md). Several admin, vendor, and delivery routes are local demo CRUD; they are not reported as live management features.
+
+**Verification:** lint passed with 16 warnings and no errors; TypeScript passed; Android JavaScript export passed with `--no-bytecode`. The standard Android export could not run because Windows denied execution of `hermesc.exe`. No APK, device, or live backend testing was performed. Existing changes and backup files were preserved.

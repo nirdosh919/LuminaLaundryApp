@@ -2,14 +2,27 @@ import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
 
 import { Fonts, ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useAppTheme } from '@/providers/app-theme-provider';
 
 export type ThemedTextProps = TextProps & {
   type?: 'default' | 'title' | 'small' | 'smallBold' | 'subtitle' | 'link' | 'linkPrimary' | 'code';
   themeColor?: ThemeColor;
 };
 
+const fontSizes = {
+  default: 16,
+  title: 48,
+  small: 14,
+  smallBold: 14,
+  subtitle: 32,
+  link: 14,
+  linkPrimary: 14,
+  code: 12,
+} as const;
+
 export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
   const theme = useTheme();
+  const { fontScale } = useAppTheme();
 
   return (
     <Text
@@ -23,6 +36,8 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
         type === 'link' && styles.link,
         type === 'linkPrimary' && styles.linkPrimary,
         type === 'code' && styles.code,
+        { fontSize: fontSizes[type] * fontScale },
+        type === 'linkPrimary' && { color: theme.primary },
         style,
       ]}
       {...rest}
@@ -63,7 +78,6 @@ const styles = StyleSheet.create({
   linkPrimary: {
     lineHeight: 30,
     fontSize: 14,
-    color: '#3c87f7',
   },
   code: {
     fontFamily: Fonts.mono,

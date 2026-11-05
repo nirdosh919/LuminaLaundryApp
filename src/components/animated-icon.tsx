@@ -8,7 +8,11 @@ import { scheduleOnRN } from 'react-native-worklets';
 const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
 const DURATION = 600;
 
-export function AnimatedSplashOverlay() {
+export function AnimatedSplashOverlay({
+  reduceMotion = false,
+}: {
+  reduceMotion?: boolean;
+}) {
   const [animate, setAnimate] = useState(false);
   const [visible, setVisible] = useState(true);
 
@@ -50,7 +54,8 @@ export function AnimatedSplashOverlay() {
     <View
       onLayout={() => {
         SplashScreen.hideAsync().finally(() => {
-          setAnimate(true);
+          if (reduceMotion) setVisible(false);
+          else setAnimate(true);
         });
       }}
       style={styles.splashOverlay}>
@@ -133,14 +138,14 @@ const styles = StyleSheet.create({
   },
   background: {
     borderRadius: 40,
-    experimental_backgroundImage: `linear-gradient(180deg, #3C9FFE, #0274DF)`,
+    experimental_backgroundImage: `linear-gradient(180deg, #2F674A, #214738)`,
     width: 128,
     height: 128,
     position: 'absolute',
   },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: '#214738',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,

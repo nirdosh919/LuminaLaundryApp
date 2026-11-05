@@ -1,0 +1,642 @@
+========== EXPO ENVIRONMENT FILE NAMES ==========
+.env
+.env.example
+========== EXPO API CLIENT ==========
+import {
+  clearAccessToken,
+  getAccessToken,
+} from "@/lib/token-storage";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/+$/, "");
+const API_INTEGRATION_ENABLED = false;
+
+type ApiErrorBody = {
+  message?: unknown;
+  errors?: unknown;
+};
+
+function getErrorMessage(body: unknown, fallback: string): string {
+  if (!body || typeof body !== "object") return fallback;
+
+  const errorBody = body as ApiErrorBody;
+  if (typeof errorBody.message === "string") return errorBody.message;
+
+  if (errorBody.errors && typeof errorBody.errors === "object") {
+    const firstError = Object.values(errorBody.errors).flat()[0];
+    if (typeof firstError === "string") return firstError;
+  }
+
+  return fallback;
+}
+
+export async function apiRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  if (!API_INTEGRATION_ENABLED) {
+    throw new Error(
+      "Laravel API integration is disabled in this local preview. Enable it only after the staging API contract has been verified.",
+    );
+  }
+
+  if (!API_BASE_URL) {
+    throw new Error(
+      "The API URL is not configured. Set EXPO_PUBLIC_API_URL in the app environment.",
+    );
+  }
+
+  const token = await getAccessToken();
+  const headers = new Headers(options.headers);
+  headers.set("Accept", "application/json");
+
+  if (options.body !== undefined && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const response = await fetch(
+    `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`,
+    { ...options, headers },
+  );
+  const responseText = await response.text();
+  let body: unknown = null;
+
+  if (responseText) {
+    try {
+      body = JSON.parse(responseText) as unknown;
+    } catch {
+      throw new Error("The server returned an invalid response.");
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) await clearAccessToken();
+    throw new Error(
+      getErrorMessage(body, `Request failed with status ${response.status}.`),
+    );
+  }
+
+  return body as T;
+}
+========== LAUNDRY API ==========
+import { apiRequest } from "@/lib/mobile-api";
+
+export type CatalogService = {
+  id: number;
+  name: string;
+  description: string | null;
+  price: number;
+  category: string | null;
+  vendor_id: number;
+  vendor_name: string | null;
+  variants: { id: number; name: string; price: number }[];
+};
+
+export type MobileOrder = {
+  id: number;
+  order_number: string;
+  status: string;
+  status_label: string;
+  pickup_date: string | null;
+  pickup_time_slot: string | null;
+  total_amount: number;
+  created_at: string | null;
+  vendor_name: string | null;
+  service: string;
+  address: string | null;
+};
+
+type ListResponse<T> = { data: T[] };
+
+export async function fetchServices(search = ""): Promise<CatalogService[]> {
+  const query = search.trim()
+    ? `?search=${encodeURIComponent(search.trim())}`
+    : "";
+  const response = await apiRequest<ListResponse<CatalogService>>(
+    `/api/mobile/services${query}`,
+  );
+  return response.data;
+}
+
+export async function createBooking(input: {
+  items: { service_item_id: number; variant_id: number | null; quantity: number }[];
+  label: string;
+  full_address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  pickup_date: string;
+  pickup_time_slot: string;
+  delivery_date: string;
+  delivery_time_slot: string;
+}): Promise<MobileOrder> {
+  const response = await apiRequest<{ data: MobileOrder }>(
+    "/api/mobile/bookings",
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  return response.data;
+}
+
+export async function fetchOrders(): Promise<MobileOrder[]> {
+  const response = await apiRequest<ListResponse<MobileOrder>>(
+    "/api/mobile/orders",
+  );
+  return response.data;
+}
+========== AUTH CLIENT ==========
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  apiRequest,
+} from "@/lib/mobile-api";
+import {
+  clearAccessToken,
+  getAccessToken,
+  saveAccessToken,
+  secureTokenStorageAvailable,
+} from "@/lib/token-storage";
+
+export type AccountRole = "customer" | "admin" | "vendor" | "driver";
+
+export type Account = {
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  role: AccountRole;
+};
+
+type AuthResponse = {
+  token: string;
+  user: Account;
+};
+
+type CurrentAccountResponse = {
+  user: Account;
+};
+
+const dashboardByRole: Record<AccountRole, string> = {
+  customer: "/customer-dashboard",
+  admin: "/admin",
+  vendor: "/vendor",
+  driver: "/driver",
+};
+
+async function persistAuth(
+  response: AuthResponse,
+  profileDetails: Record<string, string> = {},
+): Promise<Account> {
+  try {
+    await saveAccessToken(response.token);
+    await AsyncStorage.setItem(
+      "lumina_profile",
+      JSON.stringify({ ...response.user, ...profileDetails }),
+    );
+    await AsyncStorage.setItem(
+      "lumina_mobile_session",
+      JSON.stringify({ role: response.user.role }),
+    );
+    return response.user;
+  } catch (error) {
+    await clearAccessToken();
+    throw error;
+  }
+}
+
+export async function signIn(
+  role: AccountRole,
+  identity: string,
+  password: string,
+): Promise<Account> {
+  if (!secureTokenStorageAvailable) {
+    throw new Error("Sign-in is available in the installed mobile app.");
+  }
+  const response = await apiRequest<AuthResponse>("/api/mobile/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ role, identity: identity.trim(), password }),
+  });
+  return persistAuth(response);
+}
+
+export async function registerCustomer(input: {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  address: string;
+}): Promise<Account> {
+  if (!secureTokenStorageAvailable) {
+    throw new Error("Sign-in is available in the installed mobile app.");
+  }
+  const response = await apiRequest<AuthResponse>(
+    "/api/mobile/auth/register",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: input.name.trim(),
+        email: input.email.trim(),
+        phone: input.phone.trim(),
+        password: input.password,
+        password_confirmation: input.password,
+      }),
+    },
+  );
+  return persistAuth(response, { address: input.address.trim() });
+}
+
+export async function getCurrentAccount(): Promise<Account | null> {
+  if (!(await getAccessToken())) return null;
+
+  const response = await apiRequest<CurrentAccountResponse>(
+    "/api/mobile/auth/me",
+  );
+  return response.user;
+}
+
+export async function signOut(): Promise<void> {
+  let requestFailed = false;
+  let requestError: unknown;
+
+  try {
+    await apiRequest<{ message: string }>("/api/mobile/auth/logout", {
+      method: "POST",
+    });
+  } catch (error) {
+    requestFailed = true;
+    requestError = error;
+  }
+
+  await clearAccessToken();
+  await AsyncStorage.multiRemove(["lumina_profile", "lumina_mobile_session"]);
+
+  if (requestFailed) {
+    const message =
+      requestError instanceof Error ? requestError.message : "Please try again.";
+    throw new Error(`Signed out on this device, but the server sign-out failed: ${message}`);
+  }
+}
+
+export function dashboardForRole(role: AccountRole): string {
+  return dashboardByRole[role];
+}
+========== LARAVEL MOBILE API CONTROLLERS ==========
+
+--- MobileAuthController.php ---
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Admin;
+use App\Models\Customer;
+use App\Models\Driver;
+use App\Models\MobileAccessToken;
+use App\Models\Vendor;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
+
+class MobileAuthController extends Controller
+{
+    public function login(Request $request)
+    {
+        $data = $request->validate([
+            'role' => 'required|in:customer,admin,vendor,driver',
+            'identity' => 'required|string|max:255',
+            'password' => 'required|string|max:255',
+        ]);
+
+        $models = [
+            'customer' => Customer::class,
+            'admin' => Admin::class,
+            'vendor' => Vendor::class,
+            'driver' => Driver::class,
+        ];
+        $modelClass = $models[$data['role']];
+        $identity = trim($data['identity']);
+        $user = $modelClass::query()
+            ->where(function ($query) use ($identity) {
+                $query->where('email', $identity)->orWhere('phone', $identity);
+            })
+            ->first();
+
+        if (!$user || !Hash::check($data['password'], $user->password) || !$this->accountCanSignIn($data['role'], $user)) {
+            throw ValidationException::withMessages([
+                'identity' => ['The supplied credentials are invalid or the account is not active.'],
+            ]);
+        }
+
+        $plainToken = Str::random(64);
+        MobileAccessToken::query()->create([
+            'token_hash' => hash('sha256', $plainToken),
+            'authenticatable_type' => $modelClass,
+            'authenticatable_id' => $user->getKey(),
+            'role' => $data['role'],
+            'expires_at' => now()->addDays(30),
+        ]);
+
+        return response()->json([
+            'token' => $plainToken,
+            'user' => $this->accountPayload($data['role'], $user),
+        ]);
+    }
+
+    public function registerCustomer(Request $request)
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255|unique:customers,email',
+            'phone' => 'required|string|max:30|unique:customers,phone',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $customer = Customer::query()->create([
+            'name' => trim($data['name']),
+            'email' => strtolower(trim($data['email'])),
+            'phone' => trim($data['phone']),
+            'password' => $data['password'],
+            'membership_type' => 'normal',
+            'referral_code' => strtoupper(Str::random(8)),
+            'status' => 1,
+        ]);
+
+        $plainToken = Str::random(64);
+        MobileAccessToken::query()->create([
+            'token_hash' => hash('sha256', $plainToken),
+            'authenticatable_type' => Customer::class,
+            'authenticatable_id' => $customer->getKey(),
+            'role' => 'customer',
+            'expires_at' => now()->addDays(30),
+        ]);
+
+        return response()->json([
+            'token' => $plainToken,
+            'user' => $this->accountPayload('customer', $customer),
+        ], 201);
+    }
+
+    public function me(Request $request)
+    {
+        $user = $request->attributes->get('mobile_user');
+        $role = $request->attributes->get('mobile_role');
+
+        if (!$user || !$role) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        return response()->json([
+            'user' => $this->accountPayload($role, $user),
+        ]);
+    }
+    public function logout(Request $request)
+    {
+        $request->attributes->get('mobile_access_token')?->delete();
+        return response()->json(['message' => 'Logged out successfully.']);
+    }
+
+    private function accountCanSignIn(string $role, $user): bool
+    {
+        return match ($role) {
+            'customer', 'admin' => (bool) ($user->status ?? false),
+            'vendor' => $user->status === 'approved',
+            'driver' => (bool) ($user->status ?? false) && (bool) ($user->is_approved ?? false),
+            default => false,
+        };
+    }
+
+    private function accountPayload(string $role, $user): array
+    {
+        $name = match ($role) {
+            'vendor' => $user->shop_name ?: $user->owner_name ?: $user->name,
+            default => $user->name ?: trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')),
+        };
+
+        return [
+            'id' => (int) $user->getKey(),
+            'name' => (string) $name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'role' => $role,
+        ];
+    }
+}
+
+--- MobileServiceController.php ---
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\ServiceItem;
+use Illuminate\Http\Request;
+
+class MobileServiceController extends Controller
+{
+    public function index(Request $request)
+    {
+        $search = trim((string) $request->query('search', ''));
+        $items = ServiceItem::query()
+            ->with(['vendor', 'category', 'variants'])
+            ->where('status', true)
+            ->whereHas('vendor', fn ($query) => $query->where('status', 'approved'))
+            ->when($search !== '', fn ($query) => $query->where('name', 'like', '%' . addcslashes($search, '%_') . '%'))
+            ->latest()
+            ->get()
+            ->map(function (ServiceItem $item) {
+                $variants = $item->variants->where('status', true)->values();
+                return [
+                    'id' => (int) $item->id,
+                    'name' => $item->name,
+                    'description' => $item->description,
+                    'price' => $item->displayPrice(),
+                    'category' => $item->category?->name,
+                    'vendor_id' => (int) $item->vendor_id,
+                    'vendor_name' => $item->vendor?->shop_name,
+                    'variants' => $variants->map(fn ($variant) => [
+                        'id' => (int) $variant->id,
+                        'name' => $variant->name,
+                        'price' => $variant->sellingPrice(),
+                    ])->all(),
+                ];
+            });
+
+        return response()->json(['data' => $items]);
+    }
+}
+
+--- MobileBookingController.php ---
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Jobs\SendBookingBillWhatsApp;
+use App\Models\Address;
+use App\Models\Booking;
+use App\Models\Customer;
+use App\Models\ServiceItem;
+use App\Services\CommissionService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class MobileBookingController extends Controller
+{
+    private const MIN_ORDER_AMOUNT = 200;
+
+    public function store(Request $request)
+    {
+        /** @var Customer $customer */
+        $customer = $request->attributes->get('mobile_user');
+        $data = $request->validate([
+            'items' => 'required|array|min:1|max:50',
+            'items.*.service_item_id' => 'required|integer|exists:service_items,id',
+            'items.*.variant_id' => 'nullable|integer|exists:service_item_variants,id',
+            'items.*.quantity' => 'required|integer|min:1|max:50',
+            'label' => 'required|string|max:30',
+            'full_address' => 'required|string|max:1000',
+            'city' => 'required|string|max:100',
+            'state' => 'required|string|max:100',
+            'pincode' => 'required|string|max:12',
+            'pickup_date' => 'required|date|after_or_equal:today',
+            'pickup_time_slot' => 'required|string|max:60',
+            'delivery_date' => 'required|date|after_or_equal:pickup_date',
+            'delivery_time_slot' => 'required|string|max:60',
+        ]);
+
+        $resolved = [];
+        $vendorId = null;
+        $subtotal = 0.0;
+        foreach ($data['items'] as $row) {
+            $serviceItem = ServiceItem::query()
+                ->with(['vendor', 'variants'])
+                ->where('status', true)
+                ->whereHas('vendor', fn ($query) => $query->where('status', 'approved'))
+                ->findOrFail($row['service_item_id']);
+
+            if ($vendorId !== null && $vendorId !== (int) $serviceItem->vendor_id) {
+                throw ValidationException::withMessages(['items' => ['Please place one vendor order at a time.']]);
+            }
+            $vendorId = (int) $serviceItem->vendor_id;
+            $variant = null;
+            if (!empty($row['variant_id'])) {
+                $variant = $serviceItem->variants->first(fn ($candidate) => (int) $candidate->id === (int) $row['variant_id'] && (bool) $candidate->status);
+                if (!$variant) {
+                    throw ValidationException::withMessages(['items' => ['One selected service variant is unavailable.']]);
+                }
+            }
+            if ($serviceItem->hasVariants() && !$variant) {
+                throw ValidationException::withMessages(['items' => ['Please select a variant for each service that requires one.']]);
+            }
+
+            $unitPrice = $variant ? $variant->sellingPrice() : $serviceItem->sellingPrice();
+            $lineSubtotal = round($unitPrice * (int) $row['quantity'], 2);
+            $subtotal += $lineSubtotal;
+            $resolved[] = [
+                'service_item' => $serviceItem,
+                'variant' => $variant,
+                'quantity' => (int) $row['quantity'],
+                'unit_price' => $unitPrice,
+                'subtotal' => $lineSubtotal,
+                'item_name' => $serviceItem->name . ($variant ? ' - ' . $variant->name : ''),
+            ];
+        }
+
+        if ($subtotal < self::MIN_ORDER_AMOUNT) {
+            throw ValidationException::withMessages(['items' => ['Minimum order amount is ₹' . self::MIN_ORDER_AMOUNT . '.']]);
+        }
+
+        $booking = DB::transaction(function () use ($customer, $vendorId, $data, $resolved, $subtotal) {
+            $address = $customer->addresses()->create([
+                'label' => $data['label'],
+                'full_address' => $data['full_address'],
+                'city' => $data['city'],
+                'state' => $data['state'],
+                'pincode' => $data['pincode'],
+                'is_default' => $customer->addresses()->count() === 0,
+            ]);
+
+            $booking = Booking::query()->create([
+                'order_number' => Booking::generateOrderNumber(),
+                'customer_id' => $customer->id,
+                'vendor_id' => $vendorId,
+                'pickup_address_id' => $address->id,
+                'delivery_address_id' => $address->id,
+                'pickup_date' => $data['pickup_date'],
+                'pickup_time_slot' => $data['pickup_time_slot'],
+                'delivery_date' => $data['delivery_date'],
+                'delivery_time_slot' => $data['delivery_time_slot'],
+                'status' => 'pending',
+                'payment_status' => 'unpaid',
+                'payment_method' => 'cod',
+                'source' => 'app',
+                'subtotal' => $subtotal,
+                'discount_amount' => 0,
+                'delivery_charge' => 0,
+                'tax_amount' => 0,
+                'total_amount' => $subtotal,
+            ]);
+
+            foreach ($resolved as $row) {
+                $booking->items()->create([
+                    'service_id' => null,
+                    'service_item_id' => $row['service_item']->id,
+                    'variant_id' => $row['variant']?->id,
+                    'item_name' => $row['item_name'],
+                    'quantity' => $row['quantity'],
+                    'unit_price' => $row['unit_price'],
+                    'subtotal' => $row['subtotal'],
+                ]);
+            }
+            return $booking;
+        });
+
+        CommissionService::record($booking);
+        SendBookingBillWhatsApp::dispatch($booking->id);
+
+        $booking->load(['vendor', 'pickupAddress', 'items.serviceItem', 'items.variant', 'items.service']);
+        return response()->json(['data' => $this->orderPayload($booking)], 201);
+    }
+
+    public static function orderPayload(Booking $booking): array
+    {
+        return [
+            'id' => (int) $booking->id,
+            'order_number' => $booking->order_number,
+            'status' => $booking->status,
+            'status_label' => $booking->statusLabel(),
+            'pickup_date' => $booking->pickup_date?->toDateString(),
+            'pickup_time_slot' => $booking->pickup_time_slot,
+            'total_amount' => (float) $booking->total_amount,
+            'created_at' => $booking->created_at?->toISOString(),
+            'vendor_name' => $booking->vendor?->shop_name,
+            'service' => $booking->items->map(fn ($item) => $item->item_name)->implode(', '),
+            'address' => $booking->pickupAddress?->full_address,
+        ];
+    }
+}
+
+--- MobileOrderController.php ---
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Booking;
+use App\Models\Customer;
+use Illuminate\Http\Request;
+
+class MobileOrderController extends Controller
+{
+    public function index(Request $request)
+    {
+        /** @var Customer $customer */
+        $customer = $request->attributes->get('mobile_user');
+        $orders = $customer->bookings()
+            ->with(['vendor', 'pickupAddress', 'items.serviceItem', 'items.variant', 'items.service'])
+            ->latest()
+            ->get()
+            ->map(fn (Booking $booking) => MobileBookingController::orderPayload($booking));
+
+        return response()->json(['data' => $orders]);
+    }
+}

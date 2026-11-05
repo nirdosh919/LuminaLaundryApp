@@ -1,20 +1,30 @@
-{
-  "extends": "expo/tsconfig.base",
-  "compilerOptions": {
-    "strict": true,
-    "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "@/assets/*": [
-        "./assets/*"
-      ]
-    }
-  },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
-  ]
+﻿{
+    "extends":  "expo/tsconfig.base",
+    "compilerOptions":  {
+                            "strict":  true,
+                            "paths":  {
+                                          "@/*":  [
+                                                      "./src/*"
+                                                  ],
+                                          "@/assets/*":  [
+                                                             "./assets/*"
+                                                         ]
+                                      }
+                        },
+    "include":  [
+                    "**/*.ts",
+                    "**/*.tsx",
+                    ".expo/types/**/*.ts",
+                    "expo-env.d.ts"
+                ],
+    "exclude":  [
+                    "_project_audit",
+                    "_route_backups",
+                    "lumina-backup-*",
+                    "**/*.backup.tsx",
+                    "**/*.bak",
+                    "**/*.error-backup",
+                    "**/*.loop-backup",
+                    "**/*.statusbar-backup"
+                ]
 }
