@@ -1,37 +1,36 @@
-import React, { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { dashboardForRole, signIn, type AccountRole } from "@/lib/auth";
-import { PremiumBackdrop, PremiumBrand, PremiumButton, PremiumCard, Reveal } from "@/components/premium-ui";
-import { useAppTheme } from "@/providers/app-theme-provider";
-import { useRoleAccess } from "@/providers/role-access-provider";
+import React,{useState} from "react";
+import {Alert,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from "react-native";
+import {useLocalSearchParams,useRouter} from "expo-router";
+import {SafeAreaView} from "react-native-safe-area-context";
+import {dashboardForRole,signIn,type AccountRole} from "@/lib/auth";
+import {LuminaLogo} from "@/components/brand-ui";
+import {useAppTheme} from "@/providers/app-theme-provider";
+import {useRoleAccess} from "@/providers/role-access-provider";
 
-export default function RoleLoginScreen() {
-  const router = useRouter();
-  const { colors } = useAppTheme();
-  const { activateRole } = useRoleAccess();
-  const params = useLocalSearchParams<{ role?: string }>();
-  const role = params.role === "admin" || params.role === "vendor" || params.role === "driver" ? params.role : "customer";
-  const [identity, setIdentity] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
+const roles:AccountRole[]=["customer","admin","vendor","driver"];
+const labels:Record<AccountRole,string>={customer:"Customer",admin:"Admin",vendor:"Vendor",driver:"Driver"};
 
-  const login = async () => {
-    if (!identity.trim() || !password.trim()) { Alert.alert("Missing details", role === "driver" ? "Enter your phone number and password." : "Enter your email and password."); return; }
-    setBusy(true);
-    try { const account = await signIn(role as AccountRole, identity, password); activateRole(account.role); router.replace(dashboardForRole(account.role) as never); }
-    catch (error) { Alert.alert("Could not sign in", error instanceof Error ? error.message : "Please try again."); }
-    finally { setBusy(false); }
-  };
-
-  const chooseRole = (next: string) => router.replace({ pathname: "/role-login", params: { role: next } } as never);
-  const label = role === "driver" ? "Phone number" : "Email";
-
-  return <PremiumBackdrop><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-    <Reveal><PremiumBrand partner="SECURE WORKSPACE ACCESS" /></Reveal>
-    <Reveal delay={90}><Text style={[styles.eyebrow, { color: colors.primary }]}>WELCOME BACK</Text><Text style={[styles.title, { color: colors.text }]}>Sign in to your workspace.</Text><Text style={[styles.subtitle, { color: colors.textSecondary }]}>Your Lumina operations, ready when you are.</Text></Reveal>
-    <Reveal delay={170}><PremiumCard style={styles.card}><Text style={[styles.label, { color: colors.text }]}>ACCOUNT TYPE</Text><View style={styles.roles}>{(["customer", "admin", "vendor", "driver"] as const).map(item => <Pressable key={item} onPress={() => chooseRole(item)} style={[styles.role, { backgroundColor: colors.input, borderColor: colors.border }, role === item && { backgroundColor: colors.accentSoft, borderColor: colors.primary }]}><Text style={[styles.roleText, { color: role === item ? colors.primaryStrong : colors.textSecondary }]}>{item[0].toUpperCase() + item.slice(1)}</Text></Pressable>)}</View><Text style={[styles.label, { color: colors.text }]}>{label}</Text><TextInput value={identity} onChangeText={setIdentity} autoCapitalize="none" keyboardType={role === "driver" ? "phone-pad" : "email-address"} placeholder={role === "driver" ? "Your registered phone number" : "you@example.com"} placeholderTextColor={colors.textSecondary} style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.text }]} /><Text style={[styles.label, { color: colors.text }]}>Password</Text><TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder="Enter password" placeholderTextColor={colors.textSecondary} style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.text }]} /><PremiumButton disabled={busy} onPress={() => void login()}>{busy ? "Signing in…" : `Continue as ${role}`}</PremiumButton><Pressable accessibilityRole="button" onPress={() => router.replace("/register" as never)} style={styles.back}><Text style={[styles.backText, { color: colors.primary }]}>Create account</Text></Pressable><Text style={[styles.note, { color: colors.textSecondary }]}>Sign-in is verified by Lumina. Only active accounts can open this workspace.</Text></PremiumCard></Reveal>
-  </ScrollView></PremiumBackdrop>;
+export default function RoleLoginScreen(){
+ const router=useRouter(),params=useLocalSearchParams<{role?:string}>(),{colors}=useAppTheme(),{activateRole}=useRoleAccess();
+ const initial=roles.includes(params.role as AccountRole)?params.role as AccountRole:"customer";
+ const [role,setRole]=useState<AccountRole>(initial),[identity,setIdentity]=useState(""),[password,setPassword]=useState(""),[busy,setBusy]=useState(false);
+ const select=(next:AccountRole)=>{setRole(next);setIdentity("");setPassword("");router.setParams({role:next});};
+ const login=async()=>{if(!identity.trim()||!password){Alert.alert("Missing details",role==="driver"?"Enter your registered phone number and password.":"Enter your registered email and password.");return;}setBusy(true);try{const account=await signIn(role,identity.trim(),password);activateRole(account.role);router.replace(dashboardForRole(account.role) as never);}catch(e){Alert.alert("Sign in failed",e instanceof Error?e.message:"Please try again.");}finally{setBusy(false);}};
+ const showRegister=role==="customer"||role==="vendor";
+ return <SafeAreaView style={[s.safe,{backgroundColor:colors.background}]} edges={["top","bottom"]}><ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+  <View style={s.brand}><LuminaLogo height={48}/><Text style={{color:colors.textSecondary,fontSize:9,fontWeight:"700",letterSpacing:1.5}}>LAUNDRY, MADE SIMPLE</Text></View>
+  <Text style={[s.title,{color:colors.text}]}>Sign in</Text><Text style={[s.subtitle,{color:colors.textSecondary}]}>Choose your account and continue.</Text>
+  <View style={s.grid}>{roles.map(item=><Pressable key={item} onPress={()=>select(item)} style={[s.role,{backgroundColor:role===item?colors.accentSoft:colors.surface,borderColor:role===item?colors.primary:colors.border}]}><Text style={{color:role===item?colors.primaryStrong:colors.text,fontSize:13,fontWeight:"700"}}>{labels[item]}</Text></Pressable>)}</View>
+  <View style={[s.form,{backgroundColor:colors.surface,borderColor:colors.border}]}>
+   <Text style={[s.formTitle,{color:colors.text}]}>{labels[role]} login</Text>
+   <Text style={[s.label,{color:colors.text}]}>{role==="driver"?"PHONE NUMBER":"EMAIL ADDRESS"}</Text>
+   <TextInput value={identity} onChangeText={setIdentity} placeholder={role==="driver"?"Registered phone number":"name@example.com"} placeholderTextColor={colors.textSecondary} keyboardType={role==="driver"?"phone-pad":"email-address"} autoCapitalize="none" autoCorrect={false} style={[s.input,{backgroundColor:colors.input,borderColor:colors.border,color:colors.text}]}/>
+   <Text style={[s.label,{color:colors.text}]}>PASSWORD</Text>
+   <TextInput value={password} onChangeText={setPassword} placeholder="Enter password" placeholderTextColor={colors.textSecondary} secureTextEntry autoCapitalize="none" onSubmitEditing={()=>void login()} style={[s.input,{backgroundColor:colors.input,borderColor:colors.border,color:colors.text}]}/>
+   <Pressable onPress={()=>router.push((role==="vendor"?"/vendor-forgot-password":"/forgot-password") as never)} style={s.forgot}><Text style={[s.link,{color:colors.primary}]}>Forgot password?</Text></Pressable>
+   <Pressable disabled={busy} onPress={()=>void login()} style={[s.submit,{backgroundColor:colors.primary},busy&&{opacity:.65}]}><Text style={{color:colors.onPrimary,fontSize:13,fontWeight:"800"}}>{busy?"Signing in…":"Sign in"}</Text></Pressable>
+  </View>
+  {showRegister?<View style={s.register}><Text style={{color:colors.textSecondary}}>New to Lumina? </Text><Pressable onPress={()=>router.push((role==="vendor"?"/vendor-register":"/register") as never)}><Text style={[s.link,{color:colors.primary}]}>{role==="vendor"?"Register your shop":"Create account"}</Text></Pressable></View>:<Text style={[s.note,{color:colors.textSecondary}]}>Admin and driver access is provided by Lumina.</Text>}
+ </ScrollView></SafeAreaView>;
 }
-
-const styles = StyleSheet.create({ content: { flexGrow: 1, justifyContent: "center", padding: 22, gap: 18 }, eyebrow: { fontSize: 10, fontWeight: "900", letterSpacing: 1.8, marginTop: 10 }, title: { fontSize: 32, lineHeight: 39, fontWeight: "900", marginTop: 9 }, subtitle: { fontSize: 13, lineHeight: 20, marginTop: 7 }, card: { gap: 12 }, label: { fontSize: 11, fontWeight: "900", letterSpacing: 0.7 }, roles: { flexDirection: "row", gap: 7, marginBottom: 3 }, role: { flex: 1, borderRadius: 11, paddingVertical: 11, alignItems: "center", borderWidth: 1 }, roleText: { fontSize: 11, fontWeight: "800" }, input: { borderWidth: 1, borderRadius: 13, paddingHorizontal: 14, paddingVertical: 14, fontSize: 13 }, back: { alignItems: "center", paddingVertical: 5 }, backText: { fontSize: 12, fontWeight: "800" }, note: { fontSize: 10, lineHeight: 15, textAlign: "center" } });
+const s=StyleSheet.create({safe:{flex:1},content:{flexGrow:1,justifyContent:"center",paddingHorizontal:22,paddingVertical:28},brand:{alignItems:"center",marginBottom:28,gap:5},title:{fontSize:29,fontWeight:"800",textAlign:"center"},subtitle:{fontSize:13,textAlign:"center",marginTop:5,marginBottom:22},grid:{flexDirection:"row",flexWrap:"wrap",gap:9,marginBottom:16},role:{width:"48%",minHeight:46,borderRadius:11,borderWidth:1,alignItems:"center",justifyContent:"center"},form:{borderWidth:1,borderRadius:16,padding:18},formTitle:{fontSize:17,fontWeight:"800",marginBottom:17},label:{fontSize:10,fontWeight:"800",letterSpacing:.8,marginBottom:7},input:{minHeight:48,borderWidth:1,borderRadius:10,paddingHorizontal:12,fontSize:13,marginBottom:15},forgot:{alignSelf:"flex-end",marginTop:-5,marginBottom:15},link:{fontSize:12,fontWeight:"700"},submit:{minHeight:49,borderRadius:11,alignItems:"center",justifyContent:"center"},register:{flexDirection:"row",justifyContent:"center",alignItems:"center",marginTop:20},note:{textAlign:"center",fontSize:11,marginTop:20}});
